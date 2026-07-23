@@ -1,0 +1,176 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  user
+  admin
+  master_admin
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  username      String    @unique
+  passwordHash  String
+  role          UserRole  @default(user)
+  tosAcceptedAt DateTime
+  createdAt     DateTime  @default(now())
+
+  hostedSessions Session[]      @relation("HostedSessions")
+  refreshTokens  RefreshToken[]
+  bansReceived   Ban[]          @relation("BannedUser")
+  bansIssued     Ban[]          @relation("BannedByHost")
+  subscription   Subscription?
+  reportsFiled   Report[]       @relation("ReportsFiled")
+  reportsAgainst Report[]       @relation("ReportsAgainst")
+  reportsReviewed Report[]      @relation("ReportsReviewed")
+  accountBansReceived AccountBan[] @relation("AccountBanTarget")
+  accountBansIssued   AccountBan[] @relation("AccountBanIssuer")
+
+  @@map("users")
+}
+
+enum SubscriptionTier {
+  free
+  pro
+}
+
+enum SubscriptionStatus {
+  none
+  active
+  trialing
+  past_due
+  canceled
+  incomplete
+}
+
+// One row per user, created lazily on first Checkout attempt. `tier`/`status`
+// are the source of truth for capacity gating (see SessionManager) — kept in
+// sync by the Stripe webhook handler, not trusted from the client.
+model Subscription {
+  id                   String             @id @default(uuid())
+  userId               String             @unique
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeCustomerId     String             @unique
+  stripeSubscriptionId String?            @unique
+  tier                 SubscriptionTier   @default(free)
+  status               SubscriptionStatus @default(none)
+  currentPeriodEnd     DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@map("subscriptions")
+}
+
+enum SessionStatus {
+  open
+  closed
+}
+
+model Session {
+  id         String        @id @default(uuid())
+  hostUserId String
+  host       User          @relation("HostedSessions", fields: [hostUserId], references: [id], onDelete: Cascade)
+  inviteCode String        @unique
+  status     SessionStatus @default(open)
+  createdAt  DateTime      @default(now())
+  closedAt   DateTime?
+
+  @@index([hostUserId])
+  @@map("sessions")
+}
+
+enum ReportReason {
+  harassment
+  unauthorized_recording
+  unwanted_sexual_content
+  malware
+  other
+}
+
+enum ReportStatus {
+  open
+  reviewed
+  actioned
+  dismissed
+}
+
+model Report {
+  id             String       @id @default(uuid())
+  reporterId     String
+  reporter       User         @relation("ReportsFiled", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetUserId   String
+  target         User         @relation("ReportsAgainst", fields: [targetUserId], references: [id], onDelete: Cascade)
+  // Plain string, not a FK: signaling-server tracks live sessions purely
+  // in-memory (see SessionManager) and never persists a row to the `Session`
+  // model below, so a relation here would violate on every real report.
+  sessionId      String?
+  reason         ReportReason
+  description    String
+  evidencePaths  String[]     @default([])
+  status         ReportStatus @default(open)
+  reviewedByUserId String?
+  reviewedBy     User?        @relation("ReportsReviewed", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  reviewedAt     DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([targetUserId])
+  @@index([status])
+  @@map("reports")
+}
+
+// Global, admin-issued permanent ban — distinct from the host-scoped `Ban`
+// model above. Blocks login outright; ipAddress/deviceFingerprint are
+// best-effort secondary signals (both are trivially bypassable — VPN defeats
+// IP, a fingerprint can shift — so this is a layered deterrent, not airtight).
+model AccountBan {
+  id                String   @id @default(uuid())
+  targetUserId      String   @unique
+  target            User     @relation("AccountBanTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  issuedByUserId    String
+  issuedBy          User     @relation("AccountBanIssuer", fields: [issuedByUserId], references: [id], onDelete: Cascade)
+  reason            String
+  ipAddress         String?
+  deviceFingerprint String?
+  createdAt         DateTime @default(now())
+
+  @@index([ipAddress])
+  @@index([deviceFingerprint])
+  @@map("account_bans")
+}
+
+// Scoped to a specific host, per spec: "cannot join ANY session that the user
+// who banned them hosts" — not a global ban. Global account bans are Phase 6
+// (admin), a separate concept from this host-initiated one.
+model Ban {
+  id           String   @id @default(uuid())
+  bannedUserId String
+  bannedUser   User     @relation("BannedUser", fields: [bannedUserId], references: [id], onDelete: Cascade)
+  hostUserId   String
+  host         User     @relation("BannedByHost", fields: [hostUserId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+
+  @@unique([bannedUserId, hostUserId])
+  @@index([hostUserId])
+  @@map("bans")
+}
+
+model RefreshToken {
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash    String    @unique
+  rotatedFrom  String?
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}

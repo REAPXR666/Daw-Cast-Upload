@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.turbo/
+build/
+.env
+.env.*
+!.env.example
+uploads/

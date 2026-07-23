@@ -1,0 +1,22 @@
+{
+  "name": "daw-cast",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "prisma:generate": "pnpm --filter @daw-cast/db exec prisma generate",
+    "prisma:migrate": "pnpm --filter @daw-cast/db exec prisma migrate dev",
+    "postinstall": "pnpm --filter @daw-cast/desktop-client run rebuild-native"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.0",
+    "typescript": "^5.7.0"
+  },
+  "packageManager": "pnpm@11.15.1",
+  "engines": {
+    "node": ">=20"
+  }
+}

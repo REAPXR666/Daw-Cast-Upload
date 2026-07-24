@@ -26,6 +26,10 @@ export function getNextWorker(): MediasoupTypes.Worker {
   return worker;
 }
 
+export function closeAllWorkers(): void {
+  for (const worker of workers) worker.close();
+}
+
 export async function createRouter(): Promise<MediasoupTypes.Router> {
   const worker = getNextWorker();
   return worker.createRouter({ mediaCodecs });

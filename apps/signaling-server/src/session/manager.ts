@@ -3,6 +3,7 @@ import type { types as MediasoupTypes } from "mediasoup";
 import { prisma } from "@daw-cast/db";
 import {
   ALLOWED_FILE_EXTENSIONS,
+  SESSION_CAPACITY,
   type FileMeta,
   type InputIntent,
   type MediaTag,
@@ -85,6 +86,11 @@ export class SessionManager extends TypedEmitter<SessionManagerEvents> {
     const sessionId = randomUUID();
     const inviteCode = await mintInviteCode(sessionId);
 
+    const subscription = await prisma.subscription.findUnique({ where: { userId: hostUserId } });
+    const entitled = subscription?.status === "active" || subscription?.status === "trialing";
+    const tier = entitled ? subscription!.tier : "free";
+    const maxParticipants = SESSION_CAPACITY[tier as keyof typeof SESSION_CAPACITY] ?? env.FREE_TIER_MAX_PARTICIPANTS;
+
     const session: SessionState = {
       id: sessionId,
       hostUserId,
@@ -92,7 +98,7 @@ export class SessionManager extends TypedEmitter<SessionManagerEvents> {
       router,
       participants: new Map(),
       monitors: new Map(),
-      maxParticipants: env.FREE_TIER_MAX_PARTICIPANTS,
+      maxParticipants,
       createdAt: new Date(),
     };
     session.participants.set(hostUserId, {

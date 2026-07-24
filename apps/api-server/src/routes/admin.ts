@@ -17,8 +17,8 @@ export async function adminRoutes(app: FastifyInstance) {
         prisma.user.findMany({ orderBy: { createdAt: "desc" } }),
         prisma.accountBan.findMany({ select: { targetUserId: true } }),
       ]);
-      const bannedIds = new Set(bans.map((b) => b.targetUserId));
-      const summaries: AdminUserSummary[] = users.map((u) => ({
+      const bannedIds = new Set(bans.map((b: { targetUserId: string }) => b.targetUserId));
+      const summaries: AdminUserSummary[] = users.map((u: (typeof users)[number]) => ({
         id: u.id,
         email: u.email,
         username: u.username,
@@ -71,7 +71,7 @@ export async function adminRoutes(app: FastifyInstance) {
           issuedBy: { select: { id: true, username: true } },
         },
       });
-      const summaries: AccountBanSummary[] = bans.map((b) => ({
+      const summaries: AccountBanSummary[] = bans.map((b: (typeof bans)[number]) => ({
         id: b.id,
         target: b.target,
         issuedBy: b.issuedBy,

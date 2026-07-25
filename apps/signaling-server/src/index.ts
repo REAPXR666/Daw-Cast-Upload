@@ -1,4 +1,5 @@
-import Fastify from "fastify";
+import { readFileSync } from "node:fs";
+import Fastify, { type FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import { prisma } from "@daw-cast/db";
@@ -10,7 +11,21 @@ import { redis } from "./redis.js";
 async function main() {
   await initWorkerPool();
 
-  const app = Fastify({ logger: true });
+  // Both unset -> plain HTTP/WS (local dev). Both set -> Fastify terminates
+  // TLS itself; the ws upgrade path works the same over the resulting
+  // https.Server, so no change needed in attachWebSocketServer.
+  // Cast to the plain FastifyInstance type: the two branches resolve to
+  // different Fastify overloads (https.Server vs http.Server), and a union
+  // of those breaks method call resolution (.register/.get/etc). None of
+  // the methods used below actually depend on which raw server type it is.
+  const app = (
+    env.TLS_CERT_PATH && env.TLS_KEY_PATH
+      ? Fastify({
+          logger: true,
+          https: { cert: readFileSync(env.TLS_CERT_PATH), key: readFileSync(env.TLS_KEY_PATH) },
+        })
+      : Fastify({ logger: true })
+  ) as FastifyInstance;
   await app.register(helmet);
   await app.register(cors, { origin: env.CORS_ORIGIN });
   app.get("/health", async () => ({ status: "ok" }));

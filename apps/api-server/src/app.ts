@@ -1,4 +1,5 @@
-import Fastify from "fastify";
+import { readFileSync } from "node:fs";
+import Fastify, { type FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
@@ -12,7 +13,19 @@ import { billingRoutes } from "./routes/billing.js";
 import { MAX_REPORT_EVIDENCE_FILE_BYTES, MAX_REPORT_EVIDENCE_FILES } from "@daw-cast/shared-types";
 
 export async function buildApp() {
-  const app = Fastify({ logger: true });
+  // Both unset -> plain HTTP (local dev). Both set -> Fastify terminates TLS
+  // itself directly from the cert/key files, no reverse proxy needed.
+  // Cast to plain FastifyInstance: the two branches resolve to different
+  // Fastify overloads (https.Server vs http.Server), and a union of those
+  // breaks method call resolution (.register/.get/etc) below.
+  const app = (
+    env.TLS_CERT_PATH && env.TLS_KEY_PATH
+      ? Fastify({
+          logger: true,
+          https: { cert: readFileSync(env.TLS_CERT_PATH), key: readFileSync(env.TLS_KEY_PATH) },
+        })
+      : Fastify({ logger: true })
+  ) as FastifyInstance;
 
   // No client here is a browser page loading remote scripts/styles, so CSP
   // is left at helmet's safe default rather than hand-tuned — this app has

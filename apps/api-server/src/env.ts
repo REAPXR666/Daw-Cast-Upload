@@ -22,6 +22,10 @@ const EnvSchema = z
     STRIPE_PRICE_ID: z.string().min(1).optional(),
     STRIPE_SUCCESS_URL: z.string().min(1).default("https://dawcast.local/billing/success"),
     STRIPE_CANCEL_URL: z.string().min(1).default("https://dawcast.local/billing/cancel"),
+    // Both unset -> plain HTTP (local dev). Both set -> Fastify terminates TLS itself,
+    // no reverse proxy needed.
+    TLS_CERT_PATH: z.string().min(1).optional(),
+    TLS_KEY_PATH: z.string().min(1).optional(),
   })
   .refine(
     (e) => e.NODE_ENV !== "production" || !INSECURE_DEFAULTS.has(e.JWT_ACCESS_SECRET),

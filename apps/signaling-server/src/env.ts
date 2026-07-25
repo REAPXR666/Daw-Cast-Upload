@@ -17,6 +17,8 @@ const EnvSchema = z
     // Fallback only — used when a host has no Subscription row at all.
     // Real capacity comes from shared-types' SESSION_CAPACITY by tier.
     FREE_TIER_MAX_PARTICIPANTS: z.coerce.number().int().positive().default(2),
+    TLS_CERT_PATH: z.string().min(1).optional(),
+    TLS_KEY_PATH: z.string().min(1).optional(),
   })
   .refine(
     (e) => e.NODE_ENV !== "production" || !INSECURE_DEFAULTS.has(e.JWT_ACCESS_SECRET),

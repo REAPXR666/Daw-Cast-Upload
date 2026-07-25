@@ -1,4 +1,5 @@
 import type { Server as HttpServer, IncomingMessage } from "node:http";
+import type { Server as HttpsServer } from "node:https";
 import { WebSocketServer, WebSocket } from "ws";
 import type { AccessTokenClaims } from "@daw-cast/shared-types";
 import {
@@ -95,7 +96,7 @@ interface AuthenticatedRequest extends IncomingMessage {
   authClaims?: AccessTokenClaims;
 }
 
-export function attachWebSocketServer(httpServer: HttpServer): void {
+export function attachWebSocketServer(httpServer: HttpServer | HttpsServer): void {
   const wss = new WebSocketServer({ noServer: true });
 
   httpServer.on("upgrade", (req: AuthenticatedRequest, socket, head) => {
